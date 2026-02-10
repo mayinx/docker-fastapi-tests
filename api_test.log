@@ -1,0 +1,373 @@
+
+============================
+    Authentication test
+============================
+request done at "/permissions"
+| username="alice"
+| password="wonderland"
+expected result = 200
+actual result = {status_code}
+==>  {test_status}
+
+    ============================
+        Authentication test
+    ============================
+    request done at "/permissions"
+    | username="{username}"
+    | password="{password}"
+    expected result = 200
+    actual result = {status_code}
+    ==>  {test_status}
+    
+
+    ============================
+        Authentication test
+    ============================
+    request done at "/permissions"
+    | username="{username}"
+    | password="{password}"
+    expected result = 200
+    actual result = {status_code}
+    ==>  {test_status}
+    
+
+    ============================
+        Authentication test
+    ============================
+    request done at "/permissions"
+    | username="{username}"
+    | password="{password}"
+    expected result = 200
+    actual result = {status_code}
+    ==>  {test_status}
+    
+
+    ============================
+        Authentication test
+    ============================
+    request done at "/permissions"
+    | username="{username}"
+    | password="{password}"
+    expected result = 200
+    actual result = {status_code}
+    ==>  {test_status}
+    
+
+    ============================
+        Authentication test
+    ============================
+    request done at "/permissions"
+    | username="{username}"
+    | password="{password}"
+    expected result = 200
+    actual result = {status_code}
+    ==>  {test_status}
+    
+
+    ============================
+        Authentication test
+    ============================
+    request done at "/permissions"
+    | username="{username}"
+    | password="{password}"
+    expected result = 200
+    actual result = {status_code}
+    ==>  {test_status}
+    
+
+    ============================
+        Authentication test
+    ============================
+    request done at "/permissions"
+    | username="{username}"
+    | password="{password}"
+    expected result = 200
+    actual result = {status_code}
+    ==>  {test_status}
+    
+
+    ============================
+        Authentication test
+    ============================
+    request done at "/permissions"
+    | username="{username}"
+    | password="{password}"
+    expected result = 200
+    actual result = {status_code}
+    ==>  {test_status}
+    
+
+    ============================
+        Authentication test
+    ============================
+    request done at "/permissions"
+    | username="{username}"
+    | password="{password}"
+    expected result = 200
+    actual result = {status_code}
+    ==>  {test_status}
+    
+
+    ============================
+        Authentication test
+    ============================
+    request done at "/permissions"
+    | username="{username}"
+    | password="{password}"
+    expected result = 200
+    actual result = {status_code}
+    ==>  {test_status}
+    
+
+    ============================
+        Authentication test
+    ============================
+    request done at "/permissions"
+    | username="{username}"
+    | password="{password}"
+    expected result = 200
+    actual result = {status_code}
+    ==>  {test_status}
+    
+
+    ============================
+        Authentication test
+    ============================
+    request done at "/permissions"
+    | username="{username}"
+    | password="{password}"
+    expected result = 200
+    actual result = {status_code}
+    ==>  {test_status}
+    
+
+    ============================
+        Authentication test
+    ============================
+    request done at "/permissions"
+    | username="{username}"
+    | password="{password}"
+    expected result = 200
+    actual result = {status_code}
+    ==>  {test_status}
+    
+
+    ============================
+        Authentication test
+    ============================
+    request done at "/permissions"
+    | username="{username}"
+    | password="{password}"
+    expected result = 200
+    actual result = {status_code}
+    ==>  {test_status}
+    
+
+    ============================
+        Authentication test
+    ============================
+    request done at "/permissions"
+    | username="{username}"
+    | password="{password}"
+    expected result = 200
+    actual result = {status_code}
+    ==>  {test_status}
+    
+
+    ============================
+        Authentication test
+    ============================
+    request done at "/permissions"
+    | username="{username}"
+    | password="{password}"
+    expected result = 200
+    actual result = {status_code}
+    ==>  TEST STATUS: {test_status}
+    
+
+    ============================
+        Authentication test
+    ============================
+    request done at "/permissions"
+    | username="{username}"
+    | password="{password}"
+    expected result = 200
+    actual result = {status_code}
+    ==>  TEST STATUS: {test_status}
+    
+
+    ============================
+        Authentication test
+    ============================
+    request done at "/permissions"
+    | username="{username}"
+    | password="{password}"
+    expected result = 200
+    actual result = {status_code}
+    ==>  TEST STATUS: {test_status}
+    
+
+    ============================
+        Authentication test
+    ============================
+    request done at "/permissions"
+    | username="{username}"
+    | password="{password}"
+    expected result = {expected_status}
+    actual result = {status_code}
+    ==>  TEST STATUS: {test_status}
+    
+
+    ============================
+        Authentication test
+    ============================
+    request done at "/permissions"
+    | username="{username}"
+    | password="{password}"
+    expected result = {expected_status}
+    actual result = {status_code}
+    ==>  TEST STATUS: {test_status}
+    
+
+    ============================
+        Authentication test
+    ============================
+    request done at "/permissions"
+    | username="{username}"
+    | password="{password}"
+    expected result = {expected_status}
+    actual result = {status_code}
+    ==>  TEST STATUS: {test_status}
+    
+
+    ============================
+        Authentication test
+    ============================
+    request done at "/permissions"
+    | username="{test_case.username,}"
+    | password="{test_case.password}"
+    expected result = {test_case.expected_code}
+    actual result = {test_result.status_code}
+    ==> TEST STATUS: {test_result.test_status}
+    
+
+    ============================
+        Authentication test
+    ============================
+    request done at "/permissions"
+    | username="{test_case.username,}"
+    | password="{test_case.password}"
+    expected result = {test_case.expected_code}
+    actual result = {test_result.status_code}
+    ==> TEST STATUS: {test_result.test_status}
+    
+
+    ============================
+        Authentication test
+    ============================
+    request done at "/permissions"
+    | username="{test_case.username,}"
+    | password="{test_case.password}"
+    expected result = {test_case.expected_code}
+    actual result = {test_result.status_code}
+    ==> TEST STATUS: {test_result.test_status}
+    
+
+    ============================
+        Authentication test
+    ============================
+    request done at "/permissions"
+    | username="('alice',)"
+    | password="wonderland"
+    expected result = 200
+    actual result = 200
+    ==> TEST STATUS: SUCCESS
+    
+
+    ============================
+        Authentication test
+    ============================
+    request done at "/permissions"
+    | username="('bob',)"
+    | password="builder"
+    expected result = 200
+    actual result = 200
+    ==> TEST STATUS: SUCCESS
+    
+
+    ============================
+        Authentication test
+    ============================
+    request done at "/permissions"
+    | username="('clementine',)"
+    | password="mandarine"
+    expected result = 403
+    actual result = 403
+    ==> TEST STATUS: SUCCESS
+    
+
+    ============================
+        Authentication test
+    ============================
+    request done at "/permissions"
+    | username="alice"
+    | password="wonderland"
+    expected result = 200
+    actual result = 200
+    ==> TEST STATUS: SUCCESS
+    
+
+    ============================
+        Authentication test
+    ============================
+    request done at "/permissions"
+    | username="bob"
+    | password="builder"
+    expected result = 200
+    actual result = 200
+    ==> TEST STATUS: SUCCESS
+    
+
+    ============================
+        Authentication test
+    ============================
+    request done at "/permissions"
+    | username="clementine"
+    | password="mandarine"
+    expected result = 403
+    actual result = 403
+    ==> TEST STATUS: SUCCESS
+    
+
+    ============================
+        Authentication test
+    ============================
+    request done at "/permissions"
+    | username="alice"
+    | password="wonderland"
+    expected result = 200
+    actual result = 200
+    ==> TEST STATUS: SUCCESS
+    
+
+    ============================
+        Authentication test
+    ============================
+    request done at "/permissions"
+    | username="bob"
+    | password="builder"
+    expected result = 200
+    actual result = 200
+    ==> TEST STATUS: SUCCESS
+    
+
+    ============================
+        Authentication test
+    ============================
+    request done at "/permissions"
+    | username="clementine"
+    | password="mandarine"
+    expected result = 403
+    actual result = 403
+    ==> TEST STATUS: SUCCESS
+    

@@ -15,6 +15,11 @@ stop-all:
 	# Shutdown + remove orphaned containers
 	$(COMPOSE) down --remove-orphans
 
+# 🔥 Common exam issue: a stray container named "api" blocks compose if container_name: api was ever used
+kill-api:
+	@docker rm -f api >/dev/null 2>&1 && echo "Removed stray container: api" || echo "No stray container named: api"
+
+
 ps:
 	# Show running services/containers for this compose project
 	$(COMPOSE) ps
