@@ -1,0 +1,12 @@
+# logs / runtime artifacts
+shared/api_test.log
+log.txt
+
+# python
+__pycache__/
+*.pyc
+
+# OS/editor
+.DS_Store
+.vscode/
+.idea/
