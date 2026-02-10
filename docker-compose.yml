@@ -1,0 +1,14 @@
+services:
+  api:
+    image: datascientest/fastapi:1.0.0
+    ports:
+      - "8000:8000"
+    networks:
+      - sentiment_net
+    volumes:
+      # shared artifacts (test containers will write api_test.log here)
+      - ./shared:/shared
+
+networks:
+  sentiment_net:
+    driver: bridge
