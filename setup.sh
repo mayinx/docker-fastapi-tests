@@ -40,12 +40,19 @@ make start-project
 make ps
 
 # ------------------------------------------------------------------------------
-# 3) Run / wait for tests + show logs
+# 3) Run + wait for authentication tests + show logs
 # - make wait-auth: blocks until auth_test exits (exit code drives pipeline)
 # - make logs-auth: prints last lines of auth_test logs for visibility
 # ------------------------------------------------------------------------------
 make wait-auth
 make logs-auth
+
+
+# ------------------------------------------------------------------------------
+# 3) Run + wait for authorization tests + show logs
+# ------------------------------------------------------------------------------
+make wait-authz
+make logs-authz
 
 # ------------------------------------------------------------------------------
 # 4) Create submission snapshot log.txt (exam requirement)

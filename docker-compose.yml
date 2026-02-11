@@ -29,6 +29,27 @@ services:
       - API_ADDRESS=api
       - API_PORT=8000
       - LOG_PATH=/shared/api_test.log
+      - HTTP_TIMEOUT=5         
+    volumes:
+      - ./shared:/shared
+
+  authz_test:
+    build:
+      # context: ./tests/authorization
+      # dockerfile: Dockerfile
+      context: .
+      dockerfile: ./tests/authorization/Dockerfile      
+    container_name: authz_test
+    depends_on:
+      - api
+    networks:
+      - sentiment_net
+    environment:
+      - LOG=1
+      - API_ADDRESS=api
+      - API_PORT=8000
+      - LOG_PATH=/shared/api_test.log
+      - HTTP_TIMEOUT=5      
     volumes:
       - ./shared:/shared
 

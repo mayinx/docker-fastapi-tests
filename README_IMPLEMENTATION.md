@@ -143,7 +143,7 @@ We can also check if we can reach the api-endpoints and teh FastAPI Docs UI via 
 
 ---
 
-## 2) Authentication test container (GET /permissions)
+## 2) Authentication test (containerized) - GET /permissions 
 
 > ### General Requirements for all test scenarios:
 > - As per the requirements, all test scenarios are to be performed via separate containers - i.e. one dedicated container per test scenario 
@@ -210,14 +210,13 @@ CMD ["python", "/app/test_authentication.py"]
 
 Now we need to update `docker-compose.yml` to add `auth_test`: 
 
-
 ~~~yaml
 services:
   api:
     image: datascientest/fastapi:1.0.0
     container_name: api
     ports:
-      - "8000:8000"   # host:container (so you can curl localhost:8000 for manual checks)
+      - "8000:8000" # host:container (so you can curl localhost:8000 for manual checks)
     networks:
       - sentiment_net
     volumes:
@@ -239,6 +238,7 @@ services:
       - API_ADDRESS=api
       - API_PORT=8000
       - LOG_PATH=/shared/api_test.log
+      - HTTP_TIMEOUT=5   
     volumes:
       - ./shared:/shared
 
@@ -335,20 +335,148 @@ docker compose down
 
 ---
 
-### 2.6 Git commit
+## 3) Authorization Test (containerized) — verify access to /v1/sentiment vs /v2/sentiment
+
+**Exam requirement:** 
+
+### Goal
+- “Authorization” test suite in a separate container.  
+- Validate that authorization rules work:
+  - `bob` has access to v1 only
+  - `alice` has access to v1 and v2
+- For each user, call:
+  - `GET /v1/sentiment`
+  - `GET /v2/sentiment`
+- params: `username`, `password`, `sentence`.
+
+Expected outcomes
+- `alice`:
+  - `/v1/sentiment` => 200
+  - `/v2/sentiment` => 200
+- `bob`:
+  - `/v1/sentiment` => 200
+  - `/v2/sentiment` => 403
+
+### 3.1 Create the authorization test script
+
+Create `tests/authorization/test_authorization.py`  
+(implementation: see file)
 
 ~~~bash
-git add .
-git commit -m "test(auth): add authentication test container and shared logging"
+# Usage (host-run dev):
+API_ADDRESS=localhost API_PORT=8000 LOG=1 LOG_PATH=./shared/api_test.log \
+python3 -m tests.authorization.test_authorization
 ~~~
+
+What the `test_authorization.py` script does (and why):
+
+- **Authorization Tests:** It validates API authorization by calling the sentiment endpoints and checking **expected HTTP status codes** for each case:
+  - `alice` can access `/v1/sentiment` and `/v2/sentiment` → **200**
+  - `bob` can access `/v1/sentiment` → **200**
+  - `bob` must be blocked on `/v2/sentiment` → **403**
+- **Readiness Check / Polling:** It polls `GET /status` until it returns `"1"` before executing tests (because `depends_on` controls startup order, not readiness).
+- **Shared Logging:** If `LOG=1`, it appends the suite report to `LOG_PATH` (default: `/shared/api_test.log`) so multiple test containers can write into one shared log file later.
+- **Exit Codes for Pipelines:** Exits with `0` only if **all** cases pass, otherwise `1` (so CI/CD-style pipelines can fail fast).
+- **Compose DNS by default:** Uses Docker Compose internal DNS by default (`api:8000`). For host-run dev, override with `API_ADDRESS=localhost`.
 
 ---
 
-# (Paste into README_REMARKS.md)
 
-## Milestone 2 — Remarks / Justification
 
-- I implemented **one container per test** as required, starting with `auth_test`. This keeps the pipeline modular: if one test changes, only that image needs rebuilding.
-- The authentication test waits for API readiness via `/status` because `docker compose depends_on` guarantees start order but not that the API is ready to serve requests.
-- I used Compose DNS (`api:8000`) instead of host IPs to keep the solution portable and network-correct.
-- Logging is written to a shared bind mount (`./shared:/shared`) so all test containers can append into a single `api_test.log`, matching the exam’s requirement for a final consolidated report.
+### 3.2 Create the Dockerfile for this test image: `tests/authorization/Dockerfile`
+
+Like for the authentication tests, wWe build a separate test container for the authorization suite as well.
+- `python:3.12-slim` provides a minimal Python runtime
+- `pip install --no-cache-dir requests` installs the only dependency
+  - `--no-cache-dir` tells pip not to store wheel/download caches in the image layer (smaller image)
+- `CMD ["python", "..."]` runs the script when the container starts
+  - in most images, `python` points to Python 3 (equivalent to `python3`)
+
+Create `tests/authorization/Dockerfile`:
+
+~~~Dockerfile
+FROM python:3.12-slim
+
+WORKDIR /app
+
+# Install only what we need for HTTP calls
+# --no-cache-dir: don't keep pip download caches inside the image layer (smaller image)
+RUN pip install --no-cache-dir requests
+
+# Copy the test script into the image
+COPY test_authorization.py /app/test_authorization.py
+
+# Default command: run the test script
+CMD ["python", "/app/test_authorization.py"]
+~~~
+
+### 3.3 Update `docker-compose.yml`: add the `authz_test` service
+
+We add a second test service/container:
+- It builds from `tests/authorization/Dockerfile`
+- It uses the same internal API address: `API_ADDRESS=api`, `API_PORT=8000`
+- It writes into the same shared log file via the shared volume (`./shared:/shared`)
+- `depends_on` ensures the API container starts before the test container starts (readiness is handled by polling in the script)
+
+Add:
+
+~~~yaml
+  authz_test:
+    build:
+      context: ./tests/authorization
+      dockerfile: Dockerfile
+    container_name: authz_test
+    environment:
+      - API_ADDRESS=api
+      - API_PORT=8000
+      - LOG=1
+      - LOG_PATH=/shared/api_test.log
+      - HTTP_TIMEOUT=5
+    depends_on:
+      - api
+    networks:
+      - sentiment_net
+    volumes:
+      - ./shared:/shared
+~~~
+
+### 3.4 Extend Makefile with authorization helpers (optional but consistent)
+
+Add:
+
+~~~makefile
+wait-authz:
+	@echo "# [make wait-authz] Wait until authz_test finishes"
+	@$(COMPOSE) wait authz_test >/dev/null 2>&1 || true
+
+logs-authz:
+	@echo "# [make logs-authz] Print authz_test logs (tail=200)"
+	@$(COMPOSE) logs --no-color --tail=200 authz_test || true
+~~~
+
+### 3.5 Extend `setup.sh` to run Authorization test too
+
+After the auth test, run the authorization test the same way:
+
+~~~bash
+make wait-authz
+make logs-authz
+~~~
+
+### 3.6 Quick dev verification (optional)
+
+You can run the script locally against the running API (no containerization), to iterate faster:
+
+~~~bash
+API_ADDRESS=localhost API_PORT=8000 LOG=1 LOG_PATH=./shared/api_test.log \
+python3 tests/authorization/test_authorization.py
+~~~
+
+
+
+
+
+---
+
+Git commit message (after implementing this milestone):
+feat(exam): add authorization test container (v1/v2 access rules)

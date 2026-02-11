@@ -7,8 +7,8 @@ COMPOSE_PROJECT := docker-exam
 COMPOSE := docker compose -p $(COMPOSE_PROJECT)
 
 start-project:
-	@echo "# [make start-project] Start stack (detached)"
-	${COMPOSE} up -d
+	@echo "# [make start-project] Start stack (detached) and rebuild images if Dockerfiles changed"
+	${COMPOSE} up -d --build	
 
 stop-project:
 	@echo "# [make stop-project] Stop stack + remove containers/networks"
@@ -47,6 +47,18 @@ ps-api:
 wait-auth:
 	@echo "# [make wait-auth] Wait until auth_test finishes"
 	@$(COMPOSE) wait auth_test >/dev/null 2>&1 || true
+
+
+## auth helpers
+
+wait-authz:
+	@echo "# [make wait-authz] Wait until authz_test finishes"
+	@$(COMPOSE) wait authz_test >/dev/null 2>&1 || true
+
+logs-authz:
+	@echo "# [make logs-authz] Print authz_test logs (tail=200)"
+	@$(COMPOSE) logs --no-color --tail=200 authz_test || true
+
 
 # ==============================================================================
 # 🔎 LOGGING / INSPECTION
