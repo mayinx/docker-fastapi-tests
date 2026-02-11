@@ -9,6 +9,29 @@ services:
       # shared artifacts (test containers will write api_test.log here)
       - ./shared:/shared
 
+  auth_test:
+    build:
+      context: ./tests/authentication
+      dockerfile: Dockerfile
+    container_name: auth_test
+    depends_on:
+      - api
+    networks:
+      - sentiment_net
+    environment:
+      # Here we define the env vars for the test script execution 
+      # (the path to the script is defined in the Dockerfile, 
+      # which triggers the tests automatically)
+      #
+      # LOG=1 => append to shared log file (exam requirement)
+      - LOG=1
+      # These are optional overrides; defaults in the script are already correct
+      - API_ADDRESS=api
+      - API_PORT=8000
+      - LOG_PATH=/shared/api_test.log
+    volumes:
+      - ./shared:/shared
+
 networks:
   sentiment_net:
     driver: bridge

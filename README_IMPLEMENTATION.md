@@ -38,7 +38,7 @@ git init
 
 - FYI: We use a prebuild image for the api container - so we don't build the api-image ourselves - we just run it (the test containers that will be implemented later on will use Dockerfiles of course)
 - As per requriments, the API is to be made available on port 8000 of the host machine.
-- The test containers don't need port publishing (see. ports: ...) for the api-container at all - they can reach the API over the internal Docker network via the service name (http://api:8000). But having ports is convenient for manual checks like curl http://localhost:8000/status or opening /docs in the browser
+- The test containers don't need port publishing (see. `ports: ...`) for the api-container at all - they can reach the API over the internal Docker network via the service name (http://api:8000). But having `ports` defined is convenient for manual checks like curl http://localhost:8000/status or opening `/docs` in the browser
 
 
 In `docker-compose.yml`:
@@ -64,7 +64,7 @@ networks:
 This way ...
 
 - the api gets a stable service name (`api`) for Compose DNS (later tests can use `http://api:8000/...`).
-- `./shared` will be used later for the single merged `api_test.log`.
+- `./shared` will be used later for the single merged `api_test.log`, produced by the test runs. A shared bind-mount makes it easy for multiple test containers to append to the same log file deterministically.
 
 ### 1.3 Pull + run the API and validate its endpoints 
 
@@ -160,106 +160,24 @@ Run a dedicated container that tests authentication logic via the api-route `/pe
 
 ### 2.1 Create the authentication test script
 
-Create `tests/authentication/test_authentication.py`:
+Create `tests/authentication/test_authentication.py`
+(implementation see there)
 
-~~~python
-import os
-import time
-import requests
+```bash
+# Usage:
+API_ADDRESS=localhost API_PORT=8000 LOG=1 LOG_PATH=./shared/api_test.log \
+python3 tests/authentication/test_authentication.py
+```
 
-# Compose DNS: service name "api" resolves to the API container on the compose network
-API_ADDRESS = os.environ.get("API_ADDRESS", "api")
-API_PORT = int(os.environ.get("API_PORT", "8000"))
+What the `test_authentication.py` script does (and why):
 
-# Shared log file location (bind-mounted volume in docker-compose)
-LOG_PATH = os.environ.get("LOG_PATH", "/shared/api_test.log")
-
-def wait_for_api(timeout_s: int = 30) -> bool:
-    """
-    Wait until the API answers /status with '1'.
-    Why: docker-compose 'depends_on' does not guarantee the service is READY,
-    only that the container started. This makes the test container robust.
-    """
-    url = f"http://{API_ADDRESS}:{API_PORT}/status"
-    start = time.time()
-    while time.time() - start < timeout_s:
-        try:
-            r = requests.get(url, timeout=2)
-            if r.status_code == 200 and r.text.strip() == "1":
-                return True
-        except Exception:
-            pass
-        time.sleep(1)
-    return False
-
-def write_log(block: str) -> None:
-    """
-    LOG behavior (exam requirement):
-    - If LOG=1, append the report to a shared file.
-    """
-    if os.environ.get("LOG") == "1":
-        with open(LOG_PATH, "a", encoding="utf-8") as f:
-            f.write(block + "\n")
-
-def check_case(username: str, password: str, expected_code: int) -> bool:
-    url = f"http://{API_ADDRESS}:{API_PORT}/permissions"
-    r = requests.get(url, params={"username": username, "password": password}, timeout=5)
-    ok = (r.status_code == expected_code)
-
-    output = f"""
-============================
-    Authentication test
-============================
-request done at "/permissions"
-| username="{username}"
-| password="{password}"
-expected result = {expected_code}
-actual result   = {r.status_code}
-==> {("SUCCESS" if ok else "FAILURE")}
-"""
-    print(output)
-    write_log(output)
-    return ok
-
-def main() -> int:
-    ready = wait_for_api(timeout_s=40)
-    if not ready:
-        output = """
-============================
-    Authentication test
-============================
-API readiness check FAILED
-expected /status => "1"
-==> FAILURE
-"""
-        print(output)
-        write_log(output)
-        return 1
-
-    cases = [
-        ("alice", "wonderland", 200),
-        ("bob", "builder", 200),
-        ("clementine", "mandarine", 403),
-    ]
-
-    all_ok = True
-    for u, p, exp in cases:
-        all_ok = check_case(u, p, exp) and all_ok
-
-    return 0 if all_ok else 1
-
-if __name__ == "__main__":
-    raise SystemExit(main())
-~~~
-
-What this script does (and why):
-- Calls the API over the **compose internal DNS name** `api:8000` (no host IP needed).
-- Waits for readiness using `/status` because:
-  - `depends_on` ensures order, not readiness.
-- Runs the 3 exam-defined credential checks and validates HTTP status codes.
-- If `LOG=1`, appends readable reports to `/shared/api_test.log` so multiple test containers can share one log file later.
+- Authentication Tests: It validates the API authentication behavior by calling GET /permissions
+with 3 sets of known credentials and checking the expected HTTP status codes.
+- Readiness Check/Polling: It includes a readiness check (polling GET /status) to ensure the API is up before testing (because `depends_on` in docker-compose ensures just order - not readiness)
+- Shared Logging: If LOG=1, it appends the report to a shared LOG_PATH (default: /shared/api_test.log) so multiple test containers can share one log file later.
 - Exits with `0` on success, `1` on failure (important so CI/CD-style pipelines can fail fast).
-
+- Calls the API over the docker compose internal DNS name `api:8000` (no host IP needed).
+ 
 ---
 
 ### 2.2 Create a Dockerfile for the authentication test image
@@ -267,34 +185,31 @@ What this script does (and why):
 Create `tests/authentication/Dockerfile`:
 
 ~~~Dockerfile
+# Use a minimal python base image 
 FROM python:3.12-slim
 
 WORKDIR /app
 
-# Install only what we need for HTTP calls
+# Install requests - i.e3. only what we need for HTTP calls 
+# and don't keep pip's download/cache dir on disk 
 RUN pip install --no-cache-dir requests
 
+# Copy test script into teh image 
 COPY test_authentication.py /app/test_authentication.py
 
-# Default command: run the test script
+# Default command: run the test script on container start
+# (so `docker compose up` triggers the test automatically)
+# FYI: Environment vars needed for the script execution are 
+# set by docker-compose
 CMD ["python", "/app/test_authentication.py"]
 ~~~
-
-What this Dockerfile does (and why):
-- Uses a small Python base image.
-- Installs `requests` (enough for HTTP calls; keeps scope minimal).
-- Copies the test script into the image.
-- Runs the test on container start (so `docker compose up` triggers the test automatically).
 
 ---
 
 ### 2.3 Wire the authentication test container into docker-compose
 
-Update your `docker-compose.yml`:
-- keep the existing `api` service
-- add `auth_test`
-- keep your chosen network name `sentiment_net`
-- keep `./shared:/shared` on both API and test containers so log file is shared
+Now we need to update `docker-compose.yml` to add `auth_test`: 
+
 
 ~~~yaml
 services:
@@ -332,52 +247,50 @@ networks:
     driver: bridge
 ~~~
 
-Why keep `ports: "8000:8000"` on the API:
-- Not required for inter-container communication.
-- But it makes **manual debugging** fast (`curl http://localhost:8000/status` and `/docs`).
+To ensure the test log file is shared, both services mount `./shared:/shared` - all tests can append into one shared file `/shared/api_test.log`. 
 
-Why both services mount `./shared:/shared`:
-- So all tests can append into one shared file `/shared/api_test.log` (later: all 3 test containers write into the same report).
+We still keep `ports: "8000:8000"` on the API, even if it's not required for inter-container communication - sicne it makes manual debugging fast (`curl http://localhost:8000/status` and `/docs`).
 
 ---
 
-### 2.4 Add a setup.sh starter (build + run + capture logs)
+### 2.4 Add `setup.sh` as a "Pipeline Runner" (start → run tests → capture logs → cleanup)
 
-Create or update `setup.sh` (make executable with `chmod +x setup.sh`):
+We add a small `setup.sh` script that acts as a **pipeline runner** for this exam.
+
+**What it does (in order):**
+- **Resets** to a clean state (stops previous compose runs, removes stray containers, frees host port `8000` if needed)
+- **Starts** the compose stack (API + test container(s))
+- **Waits** for the `auth_test` container to finish (so the run is deterministic)
+- **Prints** the `auth_test` logs to the terminal (quick verification)
+- **Copies** the aggregated log from `./shared/api_test.log` to `./log.txt` (**exam requirement**)
+- **Stops** the stack again (avoids conflicts on rerun)
+
+FYI: the script calls **Makefile targets** to keep the runner readable and DRY (details live in `Makefile`).
+
+Create/update `setup.sh` (simplified excerpt — see implemented file for the full documented version):
 
 ~~~bash
 #!/usr/bin/env bash
 set -euo pipefail
 
-# What this script does:
-# - builds test images (because compose has a build: section for tests)
-# - starts the stack
-# - shows container status
-# - prints test logs to the terminal
-# - copies the aggregated shared log to log.txt (exam requirement: log.txt result)
-# - shuts down containers
+# Clean start (idempotent)
+make reset
 
-# Flags explained:
-# docker compose up -d --build
-# - up: create/start services
-# - -d: detached/background mode (returns to shell immediately)
-# - --build: rebuild images that have a build: section (our test containers)
+# Start stack (detached) + show status
+make start-project
+make ps
 
-docker compose up -d --build
+# Wait for test completion + print logs
+make wait-auth
+make logs-auth
 
-# Show status (ps = "process status" for compose services)
-docker compose ps
-
-# Stream auth_test logs then exit (logs = container stdout/stderr)
-docker compose logs auth_test
-
-# Copy aggregated report if present
+# Create submission snapshot log.txt from shared aggregate log (exam requirement)
 if [ -f "./shared/api_test.log" ]; then
   cp ./shared/api_test.log ./log.txt
 fi
 
-# Shutdown (down = stop + remove containers/networks created by this compose project)
-docker compose down
+# Shutdown to keep reruns conflict-free
+make stop-all
 ~~~
 
 Make it executable:
@@ -386,9 +299,7 @@ Make it executable:
 chmod +x setup.sh
 ~~~
 
----
-
-### 2.5 Run Milestone 2
+### 2.5 Run Milestone 2 (API + Authenticaiton Services)
 
 Clean previous logs (optional but recommended):
 
