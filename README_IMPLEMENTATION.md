@@ -7,39 +7,47 @@
 ---
 
 ## 📌 Index
-- [1) Repo scaffold + API container baseline](#1-repo-scaffold--api-container-baseline)
+- [1) Project scaffold + API container baseline](#1-project-scaffold--api-container-baseline)
+- [2) Authentication test (containerized) - GET /permissions](#2-authentication-test-containerized---get-permissions)
+- [3) Authorization Test (containerized) — verify access to /v1/sentiment vs /v2/sentiment](#3-authorization-test-containerized--verify-access-to-v1sentiment-vs-v2sentiment)
+- [4 Content Test (containerized) - verify sentiment](#4-content-test-containerized---verify-sentiment)
+- [5. Conclusion](#5-conclusion)
 
 ---
 
-## 1) Repo scaffold + API container baseline
+## 1) Project scaffold + API container baseline
 
 ### Goal
-- Create a git-tracked project folder for the exam hand-in 
+- Create a git-tracked project folder for the exam hand-in with the requireed structure
 - Validate that the provided API image can be started as api-service via docker-compose and reached on `/status` and `/docs`.
 
 ---
 
 ### 1.1 Create repo structure
 
-From your workspace folder:
+```text
+docker-fastapi-tests/
+├── logs/
+├── shared/
+└── tests/
+    ├── _shared/
+    ├── authentication/
+    ├── authorization/
+    └── content/    
+├── .gitignore
+├── docker-compose.yml
+├── Makefile
+├── README_IMPLEMENTATION.md
+├── README.md
+└── setup.sh
 
-```bash
-mkdir -p docker-exam-fastapi-tests
-cd docker-exam-fastapi-tests
-
-mkdir -p tests/authentication tests/authorization tests/content
-mkdir -p shared logs
-
-touch docker-compose.yml setup.sh log.txt README.md README_IMPLEMENTATION.md README_REMARKS.md .gitignore
-git init
-```
+```    
 
 ### 1.2 Add the API service (docker-compose baseline)
 
 - FYI: We use a prebuild image for the api container - so we don't build the api-image ourselves - we just run it (the test containers that will be implemented later on will use Dockerfiles of course)
 - As per requriments, the API is to be made available on port 8000 of the host machine.
 - The test containers don't need port publishing (see. `ports: ...`) for the api-container at all - they can reach the API over the internal Docker network via the service name (http://api:8000). But having `ports` defined is convenient for manual checks like curl http://localhost:8000/status or opening `/docs` in the browser
-
 
 In `docker-compose.yml`:
 
@@ -228,7 +236,13 @@ services:
       - ./shared:/shared
 
   auth_test:
+    # Run as host user so /shared/api_test.log is created/appended with correct ownership
+    # (bind mount: ./shared -> /shared). Prevents root-owned log files (which could cause 
+    # issues when resetting these files on test runs). Vars are exported by setup.sh. 
+    user: "${HOST_UID}:${HOST_GID}"  
     build:
+      # IMPORTANT: context is repo root so we can 
+      # `COPY tests /app/tests` (full package tree)    
       context: .
       dockerfile: ./tests/authentication/Dockerfile            
     container_name: auth_test
@@ -318,26 +332,6 @@ Run via script:
 ./setup.sh
 ~~~
 
-Or run manually (useful for iteration):
-
-~~~bash
-# Start in background + rebuild test images
-docker compose up -d --build
-
-# Check running containers
-docker compose ps
-
-# View test output
-docker compose logs auth_test
-
-# Check aggregated log
-ls -la ./shared/api_test.log
-cat ./shared/api_test.log
-
-# Stop everything
-docker compose down
-~~~
-
 ---
 
 ## 3) Authorization Test (containerized) — verify access to /v1/sentiment vs /v2/sentiment
@@ -386,8 +380,6 @@ What the `test_authorization.py` script does (and why):
 
 ---
 
-
-
 ### 3.2 Create the Dockerfile for this test image: `tests/authorization/Dockerfile`
 
 Like for the authentication tests, wWe build a separate test container for the authorization suite as well.
@@ -401,26 +393,9 @@ Create `tests/authorization/Dockerfile`:
 
 ~~~Dockerfile
 FROM python:3.12-slim
-
 WORKDIR /app
-
-# Install only what we need for HTTP calls
-# --no-cache-dir: don't keep pip download 
-# caches inside the image layer (smaller image)
 RUN pip install --no-cache-dir requests
-
-# Copy the entire `tests/` package tree (test modules + shared helpers) 
-# into the image, so `python -m tests...` can import `tests._shared.*` 
-# and run the suite via module path.
 COPY tests /app/tests
-
-# Default command: run the test module on container start
-# (so `docker compose up` triggers the test automatically)
-# FYI: Environment vars needed for the script execution are 
-# set by docker-compose
-# The test are run as a Python module (`-m`), so `tests.*` 
-# imports (e.g. `tests._shared...`) work because `tests/` 
-# is treated as a package tree.
 CMD ["python3", "-m", "tests.authorization.test_authorization"]
 ~~~
 
@@ -436,6 +411,7 @@ Add:
 
 ~~~yaml
   authz_test:
+    user: "${HOST_UID}:${HOST_GID}"    
     build:
       context: .
       dockerfile: ./tests/authorization/Dockerfile            
@@ -486,4 +462,116 @@ API_ADDRESS=localhost API_PORT=8000 LOG=1 LOG_PATH=./shared/api_test.log \
 python3 tests/authorization/test_authorization.py
 ~~~
 
+## 4 Content Test (containerized) - verify sentiment
 
+### 4.1 Create the content test script: `tests/content/test_content.py`
+
+This test verifies the **actual model behavior** (not just access control):
+
+- It uses the **alice** account (has access to **v1** and **v2**).
+- It sends two known sentences to **both** endpoints:
+  - `life is beautiful` → expected **positive** sentiment (score > 0)
+  - `that sucks` → expected **negative** sentiment (score < 0)
+- It checks the **sign of the returned score** (positive/negative), not only HTTP status codes.
+- It prints a readable report to stdout, and if `LOG=1` it appends to the shared log file.
+
+Create `tests/content/test_content.py`  
+(implementation: see file in repo)
+
+#### Run locally (dev / debugging)
+
+Use **module-run convention** (recommended, consistent with your package setup):
+
+~~~bash
+API_ADDRESS=localhost API_PORT=8000 LOG=1 LOG_PATH=./shared/api_test.log \
+python3 -m tests.content.test_content
+~~~
+
+#### What the `test_content.py` script does (and why)
+
+- **Content Tests:** Calls `GET /v1/sentiment` and `GET /v2/sentiment` using alice credentials + sentences, then asserts that the **score sign** matches expectations (positive vs negative).
+- **Readiness Check / Polling:** Polls `GET /status` until it returns `"1"` before running checks (because docker-compose `depends_on` ensures start order, **not** readiness).
+- **Shared Logging:** If `LOG=1`, appends output to `LOG_PATH` (default: `/shared/api_test.log`) so multiple test containers can aggregate into one log later.
+- **CI-friendly Exit Codes:** Exits with `0` if all checks pass, otherwise `1` (so a pipeline can fail fast).
+- **Compose DNS by default:** By default it targets the API via Docker Compose internal DNS `api:8000` (no host IP needed). For host-run dev, set `API_ADDRESS=localhost`.
+
+---
+
+### 4.2 Add the content test Dockerfile: `tests/content/Dockerfile`
+
+We build a dedicated container image for the content test, just like for the other test suites.
+
+Create `tests/content/Dockerfile`:
+
+~~~dockerfile
+FROM python:3.12-slim
+WORKDIR /app
+RUN pip install --no-cache-dir requests
+COPY tests /app/tests
+CMD ["python3", "-m", "tests.content.test_content"]
+~~~
+
+---
+
+### 4.3 Add the content test service to `docker-compose.yml`
+
+Add a third test container (`content_test`) to the compose pipeline.
+It shares:
+- the same network (`sentiment_net`) so it can reach `api` via DNS name `api`
+- the shared volume (`./shared:/shared`) so it can append to `/shared/api_test.log`
+- the same environment variable conventions (`LOG`, `API_ADDRESS`, `API_PORT`, `LOG_PATH`, `HTTP_TIMEOUT`)
+
+Add this service:
+
+~~~yaml
+  content_test:
+    user: "${HOST_UID}:${HOST_GID}"    
+    build:
+      context: .
+      dockerfile: ./tests/content/Dockerfile
+    container_name: content_test
+    depends_on:
+      - api
+    networks:
+      - sentiment_net
+    environment:
+      - LOG=1
+      - API_ADDRESS=api
+      - API_PORT=8000
+      - LOG_PATH=/shared/api_test.log
+      - HTTP_TIMEOUT=5
+    volumes:
+      - ./shared:/shared
+~~~
+
+---
+
+### 4.4 Extend `setup.sh` + Makefile to run the content test
+
+Add two Make targets (mirrors auth/authz):
+
+~~~makefile
+wait-content:
+	# [make wait-content] Wait until content_test finishes
+	@docker compose -p $(COMPOSE_PROJECT) wait content_test >/dev/null 2>&1 || true
+
+logs-content:
+	# [make logs-content] Print content_test logs (tail=200)
+	@docker compose -p $(COMPOSE_PROJECT) logs --no-color --tail=200 content_test || true
+~~~
+
+Then call them in `setup.sh` after auth/authz:
+
+~~~bash
+# Run + wait for content tests + show logs
+make wait-content
+make logs-content
+~~~
+
+## 5. Conclusion
+
+When we run `./setup.sh` ... 
+- docker compose will start the `api` service + all three test containers
+- upon start, the test containers automatically execute their associated test module
+- each test will append logging info into the shared `/shared/api_test.log`
+- and the script will snapshot it to `./log.txt` for submission.

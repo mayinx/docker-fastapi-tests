@@ -10,14 +10,21 @@ services:
       - ./shared:/shared
 
   auth_test:
+    # Run as host user so /shared/api_test.log is created/appended with correct ownership
+    # (bind mount: ./shared -> /shared). Prevents root-owned log files (which could cause 
+    # issues when resetting these files on test runs). Vars are exported by setup.sh. 
+    user: "${HOST_UID}:${HOST_GID}"
     build:
-      # context: ./tests/authentication
-      # dockerfile: Dockerfile
+      # IMPORTANT: context is repo root so we can `COPY tests /app/tests` (full package tree)
       context: .
       dockerfile: ./tests/authentication/Dockerfile         
     container_name: auth_test
     depends_on:
-      - api
+      api:
+        # Ensures sequential execution + deterministic log order.           
+        # Run authentication tests only after api container started.
+        # ('API Readiness' is handled inside the tests via /status-polling as well) 
+        condition: service_started
     networks:
       - sentiment_net
     environment:
@@ -36,14 +43,38 @@ services:
       - ./shared:/shared
 
   authz_test:
+    user: "${HOST_UID}:${HOST_GID}"
     build:
-      # context: ./tests/authorization
-      # dockerfile: Dockerfile
       context: .
       dockerfile: ./tests/authorization/Dockerfile      
     container_name: authz_test
     depends_on:
-      - api
+      auth_test:
+        # Run authorization tests only after after authentication tests finished successfully. 
+        # Ensures sequential execution + deterministic log order.           
+        condition: service_completed_successfully
+    networks:
+      - sentiment_net
+    environment:
+      - LOG=1
+      - API_ADDRESS=api
+      - API_PORT=8000
+      - LOG_PATH=/shared/api_test.log
+      - HTTP_TIMEOUT=5      
+    volumes:
+      - ./shared:/shared
+
+  content_test:
+    user: "${HOST_UID}:${HOST_GID}"  
+    build:
+      context: .
+      dockerfile: ./tests/content/Dockerfile
+    container_name: cnt_test
+    depends_on:
+      authz_test:
+        # Run content tests only after after authorization tests finished successfully.       
+        # Keeps pipeline (and logging) order: api -> auth -> authz -> content.    
+        condition: service_completed_successfully
     networks:
       - sentiment_net
     environment:

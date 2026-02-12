@@ -1,25 +1,30 @@
 """
-API Authentication Test Suite
------------------------------
-This script validates the API authentication behavior by calling GET /permissions
-with 3 sets of known credentials and checking the expected HTTP status codes.
+API Content Test Suite
+----------------------
+This script validates that the sentiment API returns *meaningful* results (not just correct auth).
 
-It includes a readiness check (polling GET /status) to ensure the API is up before testing
-(because docker-compose `depends_on` ensures start order, not readiness).
+What it checks:
+- Calls /v1/sentiment and /v2/sentiment using the alice account.
+- For a clearly positive sentence, the returned score must be > 0.
+- For a clearly negative sentence, the returned score must be < 0.
+  (Note: the score is a float like -0.66 / +0.42 — we only check the sign.)
 
-If LOG="1", the script appends the report to LOG_PATH (default: /shared/api_test.log),
-so multiple test containers can share one log file later.
+Reliability:
+- Includes an API readiness check (polls GET /status until it returns "1"),
+  because docker-compose `depends_on` ensures start order, not actual readiness.
 
-Exits with 0 on success, 1 on failure (so CI/CD-style pipelines can fail fast).
+Logging:
+- If LOG=1, the test appends its report to LOG_PATH (default: /shared/api_test.log),
+  so multiple test containers can write into one shared file.
 
-By default it targets the API via Docker Compose internal DNS `api:8000`
-(API_ADDRESS defaults to "api", API_PORT defaults to 8000). For host-run dev, set
-API_ADDRESS=localhost.
+Exit codes:
+- 0 on full success, 1 if any check fails (so CI/CD-style pipelines can fail fast).
 
-Usage:
+Module-run convention (recommended):
     API_ADDRESS=localhost API_PORT=8000 LOG=1 LOG_PATH=./shared/api_test.log \
-    python3 tests/authentication/test_authentication.py
+    python3 -m tests.content.test_content
 """
+
 from dataclasses import dataclass
 
 from tests._shared.types import TestCase
@@ -40,7 +45,7 @@ from tests._shared.runner import run_test_case
 cfg = load_config()
 ensure_log_dir(cfg)
 
-TEST_TYPE = "AUTHENTICATION"
+TEST_TYPE = "CONTENT"
 
 # ------------------------------------------------------------------------------
 # Suite-specific request params
@@ -51,65 +56,61 @@ TEST_TYPE = "AUTHENTICATION"
 class TestParams:
     username: str
     password: str
+    sentence: str
 
+# ------------------------------------------------------------------------------
 # Test cases
 # - api_url: endpoint path
 # - params: suite-specific TestParams
 # - expected_code: expected HTTP status
+# - expected_score: expected sentiment sign ("positive" | "negative") for content validation
 # ------------------------------------------------------------------------------
 test_cases = [
     TestCase(
-        api_url="/permissions",
-        params=TestParams(username="alice", password="wonderland"),
+        api_url="/v1/sentiment",
+        params=TestParams(username="alice", password="wonderland", sentence="life is beautiful"),
         expected_code=200,
+        expected_score="positive",
     ),
     TestCase(
-        api_url="/permissions",
-        params=TestParams(username="bob", password="builder"),
+        api_url="/v1/sentiment",
+        params=TestParams(username="alice", password="wonderland", sentence="that sucks"),
         expected_code=200,
+        expected_score="negative",
     ),
     TestCase(
-        api_url="/permissions",
-        params=TestParams(username="clementine", password="mandarine"),
-        expected_code=403,
+        api_url="/v2/sentiment",
+        params=TestParams(username="alice", password="wonderland", sentence="life is beautiful"),
+        expected_code=200,
+        expected_score="positive",
+    ),
+    TestCase(
+        api_url="/v2/sentiment",
+        params=TestParams(username="alice", password="wonderland", sentence="that sucks"),
+        expected_code=200,
+        expected_score="negative",
     ),
 ]
 
 def main() -> int:
-    """
-    Orchestrates the full test-suite run:
-    - prints the suite header
-    - ensures the API is ready (readiness gate)
-    - executes all test cases sequentially
-    - prints the suite summary
-    - returns an exit code (0=success, 1=failure) for CI/pipeline use
-    """    
-    # Suite header + metadata (also written to shared log if LOG=1)
+    """Run the CONTENT suite end-to-end and return a process exit code (0/1)."""
     log_suite_start(cfg, TEST_TYPE, len(test_cases))
 
-    # API-Readiness gate: don't run tests until /status reports the API is healthy.
-    # If the API never becomes ready within the timeout, abort the suite early.
+    # Readiness gate: fail fast with a clear log if the API never becomes healthy.
     if not wait_for_api(cfg):
         log_api_not_ready(cfg, TEST_TYPE)
         return 1
 
-     # Aggregate success across all test cases (one failing case fails the whole suite)
     all_assertions_met = True
 
-    # Run each test case and log a human-readable report entry
     for test_no, test_case in enumerate(test_cases, start=1):
         test_result = run_test_case(cfg, test_case)
         log_result(cfg, TEST_TYPE, test_no, test_case, test_result)
 
-        # Track global suite status (keep running to produce a full report)
         if not test_result.is_success:
             all_assertions_met = False
 
-    # Suite footer + overall status (also written to shared log if LOG=1)
     log_suite_finished(cfg, TEST_TYPE, all_assertions_met)
-    
-    # Exit code is used by Docker / CI pipelines:
-    # 0 => everything passed, 1 => at least one test failed (or suite aborted)
     return 0 if all_assertions_met else 1
 
 # Only run the test suite when this file is executed directly (or via `python -m ...`).

@@ -1,6 +1,12 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+# Export host UID/GID so docker-compose can run test containers as the host user.
+# Prevents root-owned files in ./shared (e.g. api_test.log) that would break cleanup.
+# (We don't export UID + GID since they are used in bash as read only vars)
+export HOST_UID="$(id -u)"
+export HOST_GID="$(id -g)"
+
 # ==============================================================================
 # Docker Exam Pipeline Runner
 # - Project: docker-exam
@@ -47,7 +53,6 @@ make ps
 make wait-auth
 make logs-auth
 
-
 # ------------------------------------------------------------------------------
 # 3) Run + wait for authorization tests + show logs
 # ------------------------------------------------------------------------------
@@ -55,15 +60,16 @@ make wait-authz
 make logs-authz
 
 # ------------------------------------------------------------------------------
+# 4) Run + wait for content tests + show logs
+# ------------------------------------------------------------------------------
+make wait-content
+make logs-content
+
+# ------------------------------------------------------------------------------
 # 4) Create submission snapshot log.txt (exam requirement)
 # - shared/api_test.log is written by the test container when LOG=1
 # ------------------------------------------------------------------------------
-if [ -f "./shared/api_test.log" ]; then
-  cp ./shared/api_test.log ./log.txt
-  printf '# Copied aggregated log: ./shared/api_test.log -> ./log.txt\n'
-else
-  printf '# Note: ./shared/api_test.log not found (LOG may be disabled or tests produced no file)\n'
-fi
+make snapshot-log
 
 # ------------------------------------------------------------------------------
 # 5) Shutdown (keeps reruns conflict-free)
