@@ -12,9 +12,14 @@ This repository implements the requested **Docker Compose test pipeline** for th
 
 ---
 
+## 🎭 Tech Stack
+🐋 **Docker / Docker Compose** | 🐍 **Python 3.12** | 🌐 **requests** | ⚙️ **Makefile orchestration**
+
+---
+
 ## 🧠 Engineering Notes (Beyond Requirements): Shared, reusable test framework
 
-While the exam only requires “3 test containers + a shared log”, I deliberately invested extra effort to keep the solution **abstract, reusable, and maintainable**—so each suite only defines its **test cases**, while the execution + logging pipeline stays consistent across all suites.
+While the exam only requires “3 test containers + test scripts + a shared log”, I deliberately invested extra effort to keep the solution **abstract, reusable, and maintainable**—so each suite only defines its **test cases** in a (mroe or less) DSL-like manner, while the execution (incl. assertions) + logging pipeline stays consistent across all suites.
 
 ### What’s abstracted (and why it matters)
 - **Central config loading** (`tests/_shared/config.py`)  
@@ -45,43 +50,52 @@ Everything else (config, readiness waiting, request execution, output format, fi
 
 ---
 
-
-## 🎭 Tech Stack
-🐋 **Docker / Docker Compose** | 🐍 **Python 3.12** | 🌐 **requests** | ⚙️ **Makefile orchestration**
-
----
-
 ## 🏗️ Architecture (Pipeline + Shared Log)
 
 ~~~text
-                         (host)
-                 ./shared/ + ./log.txt
-                      ▲           ▲
-                      │           │  (snapshot)
-          bind mount  │           └── setup.sh / make snapshot-log
-                      │
-+---------------------+------------------------------+
-|                docker compose project              |
-|                                                    |
-|  +-------------------+      +-------------------+  |
-|  |  API container     |      |  shared volume    |  |
-|  |  datascientest/... |<---->|  ./shared:/shared |  |
-|  |  :8000->:8000      |      |  api_test.log     |  |
-|  +---------+---------+      +---------+---------+  |
-|            ^                          ^            |
-|            |                          |            |
-|   depends_on (service_started)        | append     |
-|            |                          |            |
-|  +---------+---------+     +----------+----------+ |
-|  | auth_test (suite)  | -->| authz_test (suite)  | |
-|  +--------------------+     +----------+----------+ |
-|                                      -->| content_test (suite) |
-|                                         +----------------------+
-+---------------------------------------------------------------+
+                                (host)
+                       ./shared/  +  ./log.txt
+                          ▲               ▲
+                          │               │  snapshot copy
+         bind mount       │               └─ setup.sh / make snapshot-log
+      ./shared:/shared    │
+                          │
++-------------------------------------------------------------------------------+
+|                          docker compose project                               |
+|                                                                               |
+|   +--------------------------+            +------------------------------+    |
+|   |        API service        |<---------->|   internal network           |   |
+|   |  datascientest/fastapi    |  HTTP      |   sentiment_net (DNS: api)   |   |
+|   |  host 8000 -> :8000       |            +------------------------------+   |
+|   +-------------+------------+                                                |
+|                 ^                                                             |
+|                 |  (all test suites call http://api:8000/...)                 |
+|                 |                                                             |
+|   +-------------+--------------------------------------------------------+    |
+|   |                                                                      |    |
+|   |   +-------------------+     +-------------------+     +----------------+  |
+|   |   | auth_test (suite) | --> | authz_test (suite)| --> | content_test    | |
+|   |   | /permissions      |     | /v1 + /v2 access  |     | /v1 + /v2 score | |
+|   |   +---------+---------+     +---------+---------+     +--------+--------+ |
+|   |             |                       |                        |            |
+|   |             | append                | append                 | append     |
+|   |             v                       v                        v            |
+|   |       +--------------------------------------------------------------+    |
+|   |       |          shared bind mount: ./shared : /shared               |    |
+|   |       |          aggregated log:    /shared/api_test.log             |    |
+|   |       +--------------------------------------------------------------+    |
+|   |                                                                      |    |
+|   +----------------------------------------------------------------------+    |
+|                                                                               |
++-------------------------------------------------------------------------------+
 
-Sequential order is enforced with:
-auth_test -> authz_test -> content_test
-(each starts only after the previous finished successfully)
+Sequential order is enforced by docker-compose `depends_on` conditions:
+- `auth_test` waits for `api` to start (service_started) + polls /status until ready
+- `authz_test` starts only after `auth_test` finished successfully (service_completed_successfully)
+- `content_test` starts only after `authz_test` finished successfully (service_completed_successfully)
+
+All suites append into the same shared file: /shared/api_test.log
+At the end, setup.sh snapshots it to ./log.txt (exam artifact).
 ~~~
 
 ---
