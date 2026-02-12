@@ -7,15 +7,16 @@ WORKDIR /app
 # and don't keep pip's download/cache dir on disk 
 RUN pip install --no-cache-dir requests
 
-# Copy test script into teh image 
-# COPY test_authorization.py /app/test_authorization.py
-
-# copy the whole package tree (so `tests.*` imports work)
+# Copy the entire `tests/` package tree (test modules + shared helpers) 
+# into the image, so `python -m tests...` can import `tests._shared.*` 
+# and run the suite via module path.
 COPY tests /app/tests
 
-# Default command: run the test script on container start
+# Default command: run the test module on container start
 # (so `docker compose up` triggers the test automatically)
 # FYI: Environment vars needed for the script execution are 
 # set by docker-compose
-# CMD ["python", "/app/test_authorization.py"]
+# The test are run as a Python module (`-m`), so `tests.*` 
+# imports (e.g. `tests._shared...`) work because `tests/` 
+# is treated as a package tree.
 CMD ["python3", "-m", "tests.authorization.test_authorization"]

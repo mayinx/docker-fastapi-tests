@@ -11,8 +11,10 @@ services:
 
   auth_test:
     build:
-      context: ./tests/authentication
-      dockerfile: Dockerfile
+      # context: ./tests/authentication
+      # dockerfile: Dockerfile
+      context: .
+      dockerfile: ./tests/authentication/Dockerfile         
     container_name: auth_test
     depends_on:
       - api

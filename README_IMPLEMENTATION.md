@@ -194,14 +194,19 @@ WORKDIR /app
 # and don't keep pip's download/cache dir on disk 
 RUN pip install --no-cache-dir requests
 
-# Copy test script into teh image 
-COPY test_authentication.py /app/test_authentication.py
+# Copy the entire `tests/` package tree (test modules + shared helpers) 
+# into the image, so `python -m tests...` can import `tests._shared.*` 
+# and run the suite via module path.
+COPY tests /app/tests
 
-# Default command: run the test script on container start
+# Default command: run the test module on container start
 # (so `docker compose up` triggers the test automatically)
 # FYI: Environment vars needed for the script execution are 
 # set by docker-compose
-CMD ["python", "/app/test_authentication.py"]
+# The test are run as a Python module (`-m`), so `tests.*` 
+# imports (e.g. `tests._shared...`) work because `tests/` 
+# is treated as a package tree.
+CMD ["python3", "-m", "tests.authentication.test_authentication"]
 ~~~
 
 ---
@@ -224,8 +229,8 @@ services:
 
   auth_test:
     build:
-      context: ./tests/authentication
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: ./tests/authentication/Dockerfile            
     container_name: auth_test
     depends_on:
       - api
@@ -400,14 +405,23 @@ FROM python:3.12-slim
 WORKDIR /app
 
 # Install only what we need for HTTP calls
-# --no-cache-dir: don't keep pip download caches inside the image layer (smaller image)
+# --no-cache-dir: don't keep pip download 
+# caches inside the image layer (smaller image)
 RUN pip install --no-cache-dir requests
 
-# Copy the test script into the image
-COPY test_authorization.py /app/test_authorization.py
+# Copy the entire `tests/` package tree (test modules + shared helpers) 
+# into the image, so `python -m tests...` can import `tests._shared.*` 
+# and run the suite via module path.
+COPY tests /app/tests
 
-# Default command: run the test script
-CMD ["python", "/app/test_authorization.py"]
+# Default command: run the test module on container start
+# (so `docker compose up` triggers the test automatically)
+# FYI: Environment vars needed for the script execution are 
+# set by docker-compose
+# The test are run as a Python module (`-m`), so `tests.*` 
+# imports (e.g. `tests._shared...`) work because `tests/` 
+# is treated as a package tree.
+CMD ["python3", "-m", "tests.authorization.test_authorization"]
 ~~~
 
 ### 3.3 Update `docker-compose.yml`: add the `authz_test` service
@@ -423,8 +437,8 @@ Add:
 ~~~yaml
   authz_test:
     build:
-      context: ./tests/authorization
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: ./tests/authorization/Dockerfile            
     container_name: authz_test
     environment:
       - API_ADDRESS=api
@@ -473,10 +487,3 @@ python3 tests/authorization/test_authorization.py
 ~~~
 
 
-
-
-
----
-
-Git commit message (after implementing this milestone):
-feat(exam): add authorization test container (v1/v2 access rules)
