@@ -578,4 +578,4 @@ When we run `./setup.sh` ...
 
 ---
 
-**Back to project overview: [README.md](./README.md)**
+**Back to project overview: [README.md](../README.md)**
