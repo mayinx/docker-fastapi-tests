@@ -2,9 +2,8 @@
 
 > ## 👤 About
 > This README contains my personal implementation log (“exam build diary”).  
-> It was written while building the solution to keep milestones, decisions, and commands reproducible.
+> It was written while building the solution to keep milestones, decisions, and commands reproducible.  
 
----
 
 ## 📌 Index
 - [1) Project scaffold + API container baseline](#1-project-scaffold--api-container-baseline)
@@ -27,6 +26,8 @@
 
 ```text
 docker-fastapi-tests/
+├── docs/
+    ├── IMPLEMENTATION.md
 ├── logs/
 ├── shared/
 └── tests/
@@ -37,7 +38,6 @@ docker-fastapi-tests/
 ├── .gitignore
 ├── docker-compose.yml
 ├── Makefile
-├── README_IMPLEMENTATION.md
 ├── README.md
 └── setup.sh
 
@@ -575,3 +575,7 @@ When we run `./setup.sh` ...
 - upon start, the test containers automatically execute their associated test module
 - each test will append logging info into the shared `/shared/api_test.log`
 - and the script will snapshot it to `./log.txt` for submission.
+
+---
+
+**Back to project overview: [README.md](./README.md)**

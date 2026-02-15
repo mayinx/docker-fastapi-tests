@@ -1,14 +1,14 @@
 # 🐋 Docker Exam Project: FastAPI Sentiment Test Pipeline
-### Tested sentiment analysis API • Reproducible • CI/CD-style • One container per test suite • Shared aggregated log
+### Tested sentiment analysis API • Python-based tests • Reproducible • CI/CD-style • One container per test suite • Shared aggregated log
 
 ## 🎯 What this project demonstrates
-This repository implements the requested **Docker Compose test pipeline** for the provided sentiment analysis API image `datascientest/fastapi:1.0.0`.
+This repository implements a **Docker Compose test pipeline** for the sentiment analysis API image `datascientest/fastapi:1.0.0`.
 
 ✅ **API container** exposed on host port 8000 (endpoints: `/status`, `/permissions`, `/v1/sentiment`, `/v2/sentiment`)  
-✅ **3 separate test containers** (one per suite) that validate:
+✅ **3 separate Python test containers** (one per suite) that validate:
 - **Authentication** (`/permissions`)
 - **Authorization** (`/v1/sentiment` vs `/v2/sentiment`)
-- **Content** (positive/negative score checks)
+- **Content** (positive/negative score checks for given sentences)
 
 ✅ **Automatic sequential execution** via Compose `depends_on` conditions: API → Authentication → Authorization → Content  
 ✅ **LOG=1** support: all suites append into a single shared **`api_test.log`** (kept in `./shared/`).  
@@ -112,8 +112,9 @@ At the end, setup.sh snapshots it to ./log.txt (exam artifact).
 ├── Makefile
 ├── setup.sh
 ├── README.md
-├── README_IMPLEMENTATION.md
 ├── log.txt                  # exam artifact (snapshotted from ./shared/api_test.log)
+├── docs/
+    ├── IMPLEMENTATION.md
 ├── shared/
 │   └── api_test.log         # aggregated suite logs (written by test containers when LOG=1)
 └── tests/
@@ -169,11 +170,12 @@ curl -s -o /dev/null -w "%{http_code}\n" "http://localhost:8000/docs"
 
 ---
 
-## 🧾 Implementation log / “student notes” (exam diary)
+## 🧾 Implementation log  
 
 Instead of maintaining a separate `README_student.md`, this project keeps a single detailed build diary:
 
-➡️ See **`README_IMPLEMENTATION.md`** for step-by-step implementation notes, decisions, and commands.
+➡️ See **`docs/IMPLEMENTATION.md`** for step-by-step implementation notes, decisions, and commands:
+-  [docs/IMPLEMENTATION.md](docs/IMPLEMENTATION.md)
 
 ---
 
@@ -189,19 +191,26 @@ This keeps `./shared/api_test.log` writable and removable without `sudo`, and ma
 
 ---
 
-## ✅ Deliverables checklist (Exam Requirements)
+## APPENDIX: Original Exam Brief (excerpt)
+
+**Goal:** Build a small **CI/CD-style Docker Compose pipeline** that automatically tests a provided **sentiment analysis FastAPI** container image.
+
+- API image: `datascientest/fastapi:1.0.0`
+- Endpoints: `/status`, `/permissions`, `/v1/sentiment`, `/v2/sentiment`
+- **Pipeline requirement:** Docker Compose must launch **4 containers total**:
+  - 1× API container
+  - **3× separate test containers** (**Authentication**, **Authorization**, **Content**) — one python test suite per container
+- **Logging requirement:** When `LOG=1`, each suite must append its report into **`api_test.log`** (single aggregated file)
+- **Expected test coverage:**
+  - Authentication: `/permissions` returns **200** for `alice:wonderland` and `bob:builder`, and **403** for `clementine:mandarine`
+  - Authorization: `bob` can use **v1 only**, `alice` can use **v1 and v2**
+  - Content: using `alice`, sentences **"life is beautiful"** (positive score) and **"that sucks"** (negative score) must be validated for both **v1** and **v2**
+- Final deliverables include: `docker-compose.yml`, Python test scripts, Dockerfiles, `setup.sh`, and a submission `log.txt` containing the aggregated results.
+
+### ✅ Deliverables checklist (Exam Requirements)
 - ✅ `docker-compose.yml` contains the **sequence of tests** (API + 3 suites)
 - ✅ Python test files for **Authentication / Authorization / Content**
 - ✅ Dockerfiles to build each test image
 - ✅ `setup.sh` to build + launch the compose pipeline
 - ✅ `log.txt` containing the aggregated logs (snapshotted from `./shared/api_test.log`)
-- ✅ Optional remarks file: `README_IMPLEMENTATION.md`
-
----
-
-## APPENDIX: Original Exam Brief (excerpt)
-- API image: `datascientest/fastapi:1.0.0`
-- Endpoints: `/status`, `/permissions`, `/v1/sentiment`, `/v2/sentiment`
-- 3 containers for tests (one per suite)
-- If `LOG=1`, write to `api_test.log`
-- Compose runs 4 containers total, and final output includes aggregated log + submission archive
+- ✅ Optional remarks file: [docs/IMPLEMENTATION.md](docs/IMPLEMENTATION.md)
