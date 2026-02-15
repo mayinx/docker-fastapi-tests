@@ -1,14 +1,18 @@
 # 🐋 Docker Exam Project: FastAPI Sentiment Test Pipeline
-### Reproducible • CI/CD-style • One container per test suite • Shared aggregated log
+### Tested sentiment analysis API • Reproducible • CI/CD-style • One container per test suite • Shared aggregated log
 
-## 🎯 What this project demonstrates (Exam Objectives)
-This repository implements the requested **Docker Compose test pipeline** for the provided API image `datascientest/fastapi:1.0.0`.
+## 🎯 What this project demonstrates
+This repository implements the requested **Docker Compose test pipeline** for the provided sentiment analysis API image `datascientest/fastapi:1.0.0`.
 
-✅ **API container** exposed on host port **8000**  
-✅ **3 separate test containers** (one per suite): Authentication, Authorization, Content  
-✅ **LOG=1** support: all suites append into a single shared **`api_test.log`**  
+✅ **API container** exposed on host port 8000 (endpoints: `/status`, `/permissions`, `/v1/sentiment`, `/v2/sentiment`)  
+✅ **3 separate test containers** (one per suite) that validate:
+- **Authentication** (`/permissions`)
+- **Authorization** (`/v1/sentiment` vs `/v2/sentiment`)
+- **Content** (positive/negative score checks)
+
+✅ **Automatic sequential execution** via Compose `depends_on` conditions: API → Authentication → Authorization → Content  
+✅ **LOG=1** support: all suites append into a single shared **`api_test.log`** (kept in `./shared/`).  
 ✅ **`setup.sh`** runs the whole pipeline reproducibly and produces **`log.txt`** (submission artifact)  
-✅ **Sequential execution** of test suites via Compose `depends_on` conditions
 
 ---
 
@@ -109,7 +113,6 @@ At the end, setup.sh snapshots it to ./log.txt (exam artifact).
 ├── setup.sh
 ├── README.md
 ├── README_IMPLEMENTATION.md
-├── README_REMARKS.md
 ├── log.txt                  # exam artifact (snapshotted from ./shared/api_test.log)
 ├── shared/
 │   └── api_test.log         # aggregated suite logs (written by test containers when LOG=1)
@@ -192,7 +195,7 @@ This keeps `./shared/api_test.log` writable and removable without `sudo`, and ma
 - ✅ Dockerfiles to build each test image
 - ✅ `setup.sh` to build + launch the compose pipeline
 - ✅ `log.txt` containing the aggregated logs (snapshotted from `./shared/api_test.log`)
-- ✅ Optional remarks file: `README_REMARKS.md`
+- ✅ Optional remarks file: `README_IMPLEMENTATION.md`
 
 ---
 
